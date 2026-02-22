@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  fastapi-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Оптимизация сборки: использование BuildKit
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: fastapi-app:latest
+    container_name: fastapi-app
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Для разработки можно раскомментировать для hot-reload
+      # - ./main.py:/app/main.py
+      - ./logs:/app/logs
+    restart: unless-stopped
+    # Ограничения ресурсов для production
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
