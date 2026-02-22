@@ -96,7 +96,7 @@ async def update_item(item_id: int, item: Item):
     
     updated_item = {
         "id": item_id,
-        **item.dict()
+        **item.model_dump()
     }
     items_db[index] = updated_item
     return updated_item
