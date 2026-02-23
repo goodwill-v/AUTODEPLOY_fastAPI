@@ -1,5 +1,4 @@
 # Production: образ из GHCR (без сборки на сервере)
-version: '3.8'
 
 services:
   fastapi-app:
