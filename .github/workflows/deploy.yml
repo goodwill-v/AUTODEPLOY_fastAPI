@@ -68,7 +68,9 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          script: mkdir -p /opt/fastapi-app/logs
+          script: |
+            mkdir -p /opt/fastapi-app/logs
+            rm -rf /opt/fastapi-app/docker-compose.yml
 
       - name: Copy docker-compose to server
         uses: appleboy/scp-action@v0.1.7
