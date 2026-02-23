@@ -90,4 +90,8 @@ jobs:
           envs: GH_PAT
           script: |
             echo "$GH_PAT" | docker login ghcr.io -u goodwill-v --password-stdin
-            cd /opt/fastapi-app && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d --force-recreate
+            cd /opt/fastapi-app && \
+            docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+            docker rm -f fastapi-app 2>/dev/null || true
+            docker compose -f docker-compose.prod.yml pull && \
+            docker compose -f docker-compose.prod.yml up -d
