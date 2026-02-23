@@ -6,7 +6,7 @@ import os
 
 app = FastAPI(
     title="FastAPI Template",
-    description="Шаблонное FastAPI приложение.!МИНЗДРАВ ПРЕДУПРЕЖДАЕТ: ЛЕГКОМЫСЛЕННЫЕ КОММИТЫ УГРОЖАЮТ ЗДОРОВЬЮ",
+    description="Шаблонное FastAPI приложение.",
     version="1.0.0"
 )
 

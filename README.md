@@ -1,381 +1,208 @@
-# FastAPI Template Application
+# Деплой FastAPI через GitHub Container Registry
 
-Шаблонное FastAPI приложение с Docker и настройками для деплоя.
-!МИНЗДРАВ ПРЕДУПРЕЖДАЕТ: ЛЕГКОМЫСЛЕННЫЕ КОММИТЫ УГРОЖАЮТ ЗДОРОВЬЮ!
-
-## Возможности
-
-- ✅ RESTful API с CRUD операциями
-- ✅ Автоматическая документация Swagger/OpenAPI
-- ✅ Docker контейнеризация
-- ✅ Docker Compose для удобного деплоя
-- ✅ Health check endpoint
-- ✅ CORS middleware
-- ✅ Готовая структура для расширения
-
-## Быстрый старт
-
-### Локальная разработка
-
-1. Установите зависимости:
-```bash
-pip install -r requirements.txt
-```
-
-2. Запустите приложение:
-```bash
-python main.py
-```
-
-Или с помощью uvicorn:
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-3. Откройте в браузере:
-- API: http://localhost:8000
-- Документация: http://localhost:8000/docs
-- Альтернативная документация: http://localhost:8000/redoc
-
-### Docker
-
-1. Соберите образ:
-```bash
-docker build -t fastapi-app .
-```
-
-2. Запустите контейнер:
-```bash
-docker run -p 8000:8000 fastapi-app
-```
-
-### Docker Compose
-
-1. Запустите приложение:
-```bash
-docker-compose up -d
-```
-
-2. Остановите приложение:
-```bash
-docker-compose down
-```
-
-3. Просмотр логов:
-```bash
-docker-compose logs -f
-```
-
-## API Endpoints
-
-- `GET /` - Корневой endpoint
-- `GET /health` - Health check
-- `GET /items` - Получить все элементы
-- `GET /items/{item_id}` - Получить элемент по ID
-- `POST /items` - Создать новый элемент
-- `PUT /items/{item_id}` - Обновить элемент
-- `DELETE /items/{item_id}` - Удалить элемент
-
-## Примеры запросов
-
-### Создать элемент
-```bash
-curl -X POST "http://localhost:8000/items" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Тестовый товар",
-    "description": "Описание товара",
-    "price": 99.99,
-    "tax": 10.0
-  }'
-```
-
-### Получить все элементы
-```bash
-curl "http://localhost:8000/items"
-```
-
-### Получить элемент по ID
-```bash
-curl "http://localhost:8000/items/1"
-```
-
-## Деплой
-
-### Production рекомендации
-
-1. Измените настройки CORS в `main.py` на конкретные домены
-2. Используйте переменные окружения для конфигурации
-3. Настройте reverse proxy (nginx) перед приложением
-4. Используйте процесс-менеджер (systemd, supervisor) или оркестратор (Kubernetes)
-5. Настройте логирование и мониторинг
-
-### Переменные окружения
-
-Скопируйте `.env.example` в `.env` и настройте переменные:
-```bash
-cp .env.example .env
-```
-
-## Структура проекта
-
-```
-fastapi_app/
-├── main.py              # Основное приложение
-├── requirements.txt     # Python зависимости
-├── Dockerfile           # Docker образ
-├── docker-compose.yml   # Docker Compose конфигурация
-├── .dockerignore       # Исключения для Docker
-├── .env.example        # Пример переменных окружения
-└── README.md           # Документация
-```
-
-## Лицензия
-
-MIT
+Автоматический деплой приложения на сервер: при push в репозиторий образ собирается, публикуется в GitHub Container Registry (GHCR) и разворачивается на VPS.
 
 ---
 
-## Руководство для новичков: Как использовать API
+## 1. Деплой через GitHub Container Registry на сервер
 
-Если вы впервые работаете с API, этот раздел поможет вам понять основы и начать использовать это приложение.
+### 1.1 Общая схема
 
-### Что такое API?
+1. Разработчик пушит код в ветку `main` или `master` (или запускает workflow вручную).
+2. **GitHub Actions** собирает Docker-образ по `Dockerfile` и пушит его в **GHCR** (`ghcr.io/goodwill-v/autodeploy_fastapi`).
+3. Тот же workflow по SSH подключается к серверу, копирует `docker-compose.prod.yml`, логинится в GHCR, подтягивает новый образ и перезапускает контейнер.
 
-API (Application Programming Interface) — это способ общения между программами. Представьте, что API — это официант в ресторане: вы делаете заказ (отправляете запрос), а официант приносит вам блюдо (возвращает ответ).
+В итоге приложение доступно по адресу сервера, например: **http://147.45.245.124:8000/docs**
 
-### Шаг 1: Запустите приложение
+### 1.2 Настройка GitHub
 
-Сначала убедитесь, что приложение запущено:
+**Репозиторий:** [goodwill-v/AUTODEPLOY_fastAPI](https://github.com/goodwill-v/AUTODEPLOY_fastAPI)
+
+**Секреты репозитория** (Settings → Secrets and variables → Actions):
+
+| Секрет    | Описание |
+|----------|----------|
+| `GH_PAT` | Personal Access Token (GitHub) с правом `read:packages` (для доступа к GHCR с сервера) |
+| `HOST`   | IP или hostname VPS (например, `147.45.245.124`) |
+| `USERNAME` | Пользователь SSH (например, `root`) |
+| `SSH_KEY` | Приватный SSH-ключ для доступа к серверу |
+
+**Workflow permissions:** в настройках репозитория включите доступ workflow к GitHub Container Registry (Settings → Actions → General → Workflow permissions → Read and write permissions).
+
+### 1.3 Подготовка сервера
+
+На VPS нужно один раз установить Docker и подготовить каталог. Подробная инструкция — в файле **[SERVER_SETUP.md](SERVER_SETUP.md)**. Кратко:
+
+1. **Установить Docker и Docker Compose:**
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   apt install docker-compose-plugin -y
+   ```
+
+2. **Создать каталог приложения:**
+   ```bash
+   mkdir -p /opt/fastapi-app/logs
+   ```
+
+3. **Ничего больше вручную не требуется:** файл `docker-compose.prod.yml` на сервер копирует workflow при каждом деплое.
+
+После первого успешного деплоя приложение будет слушать порт **8000**. Проверка: `http://<IP_СЕРВЕРА>:8000/` и `http://<IP_СЕРВЕРА>:8000/docs`.
+
+### 1.4 Что делает workflow при деплое
+
+- **Job `build-and-push`:** checkout → сборка образа → push в GHCR с тегами `latest` и SHA коммита.
+- **Job `deploy`:** после успешного push:
+  - создаётся каталог `/opt/fastapi-app/logs` при необходимости;
+  - на сервер копируется `docker-compose.prod.yml`;
+  - выполняется вход в GHCR по `GH_PAT`;
+  - старый контейнер останавливается и удаляется;
+  - подтягивается новый образ и запускается `docker compose up -d`.
+
+Файл workflow: [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+
+### 1.5 Ручной запуск деплоя
+
+В репозитории: **Actions** → **Build, Push to GHCR and Deploy** → **Run workflow** → выбрать ветку и запустить.
+
+---
+
+## 2. Использование Makefile
+
+Makefile упрощает сборку и публикацию образа в GHCR и коммит в репозиторий.
+
+### 2.1 Переменные
+
+| Переменная | Значение по умолчанию | Описание |
+|------------|------------------------|----------|
+| `VERSION`  | из `git describe --tags` или `0.0.1` | Тег образа (без префикса `v`) |
+| `MSG`      | `тест_Х` | Сообщение коммита для цели `commit` |
+
+Образ: **`ghcr.io/goodwill-v/autodeploy_fastapi`**.
+
+### 2.2 Цели
+
+| Команда | Описание |
+|---------|----------|
+| `make help` | Справка по целям и переменным |
+| `make login` | Вход в GHCR. Токен передаётся через stdin: `echo $GH_PAT \| make login` |
+| `make build` | Сборка образа с тегами `$(VERSION)` и `latest` |
+| `make push` | Сборка (если нужно) и пуш обоих тегов в GHCR |
+| `make build-push` | Сначала `login`, затем сборка и пуш |
+| `make commit` | `git init`, `git add .`, коммит с сообщением `commit: $(MSG)`, ветка `main`, пуш в `origin` |
+
+### 2.3 Примеры
 
 ```bash
-python main.py
+# Справка
+make help
+
+# Сборка с версией по умолчанию
+make build
+
+# Сборка с указанной версией
+make build VERSION=1.2.0
+
+# Публикация в GHCR (сначала залогиниться)
+echo $GH_PAT | make login
+make push
+
+# Или одной командой (токен через stdin)
+echo $GH_PAT | make build-push
+
+# Коммит с сообщением по умолчанию ("commit: тест_Х")
+make commit
+
+# Коммит с своим сообщением
+make commit MSG="fix: обновлен deploy"
 ```
 
-Вы должны увидеть сообщение о том, что сервер запущен на `http://localhost:8000`.
+Перед первым `make commit` задайте remote:
+```bash
+git remote add origin https://github.com/goodwill-v/AUTODEPLOY_fastAPI.git
+```
 
-### Шаг 2: Откройте интерактивную документацию
+---
 
-Самый простой способ начать работу — использовать встроенную документацию:
+## 3. Описание приложения FastAPI
 
-1. Откройте браузер и перейдите по адресу: **http://localhost:8000/docs**
-2. Вы увидите страницу Swagger UI со всеми доступными операциями
-3. Здесь вы можете:
-   - Видеть все доступные endpoints (точки входа в API)
-   - Пробовать выполнять запросы прямо в браузере
-   - Видеть примеры данных и ответов
+Шаблонное FastAPI приложение с REST API, Docker и настройками для деплоя.
 
-### Шаг 3: Попробуйте простые операции
+### Возможности
 
-#### Вариант 1: Использование браузера (самый простой способ)
+- RESTful API с CRUD по элементам (items)
+- Документация Swagger/OpenAPI (`/docs`, `/redoc`)
+- Docker и Docker Compose
+- Health check `/health`, CORS middleware
 
-**1. Проверка работы API:**
-   - Откройте: http://localhost:8000
-   - Вы увидите приветственное сообщение
+### Локальная разработка
 
-**2. Проверка здоровья сервера:**
-   - Откройте: http://localhost:8000/health
-   - Должен вернуться ответ: `{"status": "healthy"}`
+```bash
+pip install -r requirements.txt
+python main.py
+# или
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-**3. Получение списка элементов:**
-   - Откройте: http://localhost:8000/items
-   - Пока список пуст: `[]`
+- API: http://localhost:8000  
+- Документация: http://localhost:8000/docs  
 
-#### Вариант 2: Использование Swagger UI (рекомендуется для новичков)
+### Docker (локально)
 
-1. Откройте http://localhost:8000/docs
-2. Найдите раздел **POST /items** и нажмите "Try it out"
-3. Замените пример данных на свои:
-   ```json
-   {
-     "name": "Мой первый товар",
-     "description": "Это описание моего товара",
-     "price": 150.50,
-     "tax": 15.0
-   }
-   ```
-4. Нажмите "Execute"
-5. Вы увидите ответ с созданным элементом и его ID
+```bash
+docker-compose up -d
+docker-compose logs -f
+docker-compose down
+```
 
-**Теперь попробуйте получить созданный элемент:**
-1. Найдите раздел **GET /items/{item_id}**
-2. Нажмите "Try it out"
-3. Введите ID (обычно это `1` для первого элемента)
-4. Нажмите "Execute"
-5. Вы увидите данные вашего товара
+### API Endpoints
 
-#### Вариант 3: Использование curl (для командной строки)
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/` | Приветствие |
+| GET | `/health` | Health check |
+| GET | `/items` | Список элементов |
+| GET | `/items/{item_id}` | Элемент по ID |
+| POST | `/items` | Создать элемент |
+| PUT | `/items/{item_id}` | Обновить элемент |
+| DELETE | `/items/{item_id}` | Удалить элемент |
 
-**Создать новый элемент:**
+### Примеры запросов
+
+**Создать элемент:**
 ```bash
 curl -X POST "http://localhost:8000/items" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Ноутбук",
-    "description": "Игровой ноутбук",
-    "price": 75000,
-    "tax": 7500
-  }'
+  -d '{"name": "Товар", "description": "Описание", "price": 99.99, "tax": 10.0}'
 ```
 
 **Получить все элементы:**
 ```bash
-curl http://localhost:8000/items
+curl "http://localhost:8000/items"
 ```
 
-**Получить элемент по ID (например, ID=1):**
-```bash
-curl http://localhost:8000/items/1
+### Структура проекта
+
+```
+fastapi_app/
+├── main.py                 # Приложение FastAPI
+├── requirements.txt        # Зависимости Python
+├── Dockerfile              # Образ для production
+├── docker-compose.yml      # Локальная разработка
+├── docker-compose.prod.yml # Production (образ из GHCR)
+├── .github/workflows/deploy.yml  # CI/CD: сборка, GHCR, деплой
+├── Makefile                # Сборка, пуш образа, коммит
+├── SERVER_SETUP.md         # Подготовка сервера к деплою
+└── README.md               # Документация
 ```
 
-**Обновить элемент:**
-```bash
-curl -X PUT "http://localhost:8000/items/1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Обновленный ноутбук",
-    "description": "Новое описание",
-    "price": 80000,
-    "tax": 8000
-  }'
-```
+### Рекомендации для production
 
-**Удалить элемент:**
-```bash
-curl -X DELETE "http://localhost:8000/items/1"
-```
+- Ограничить CORS в `main.py` конкретными доменами.
+- Использовать переменные окружения для конфигурации.
+- При необходимости поставить перед приложением reverse proxy (nginx) и настроить HTTPS.
 
-#### Вариант 4: Использование Python
+---
 
-Создайте файл `test_api.py`:
+## Лицензия
 
-```python
-import requests
-
-# Базовый URL API
-BASE_URL = "http://localhost:8000"
-
-# 1. Проверка работы API
-response = requests.get(f"{BASE_URL}/")
-print("Приветствие:", response.json())
-
-# 2. Создание нового элемента
-new_item = {
-    "name": "Смартфон",
-    "description": "Флагманский смартфон",
-    "price": 50000,
-    "tax": 5000
-}
-response = requests.post(f"{BASE_URL}/items", json=new_item)
-created_item = response.json()
-print("Создан элемент:", created_item)
-item_id = created_item["id"]
-
-# 3. Получение всех элементов
-response = requests.get(f"{BASE_URL}/items")
-all_items = response.json()
-print("Все элементы:", all_items)
-
-# 4. Получение элемента по ID
-response = requests.get(f"{BASE_URL}/items/{item_id}")
-item = response.json()
-print("Элемент по ID:", item)
-
-# 5. Обновление элемента
-updated_item = {
-    "name": "Обновленный смартфон",
-    "description": "Новое описание",
-    "price": 55000,
-    "tax": 5500
-}
-response = requests.put(f"{BASE_URL}/items/{item_id}", json=updated_item)
-print("Обновленный элемент:", response.json())
-
-# 6. Удаление элемента
-response = requests.delete(f"{BASE_URL}/items/{item_id}")
-print("Элемент удален, статус:", response.status_code)
-```
-
-Запустите скрипт:
-```bash
-pip install requests
-python test_api.py
-```
-
-#### Вариант 5: Использование JavaScript (для веб-разработчиков)
-
-```javascript
-const BASE_URL = 'http://localhost:8000';
-
-// 1. Создание элемента
-async function createItem() {
-  const response = await fetch(`${BASE_URL}/items`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: 'Планшет',
-      description: 'Графический планшет',
-      price: 25000,
-      tax: 2500
-    })
-  });
-  const data = await response.json();
-  console.log('Создан элемент:', data);
-  return data.id;
-}
-
-// 2. Получение всех элементов
-async function getAllItems() {
-  const response = await fetch(`${BASE_URL}/items`);
-  const data = await response.json();
-  console.log('Все элементы:', data);
-  return data;
-}
-
-// 3. Получение элемента по ID
-async function getItemById(id) {
-  const response = await fetch(`${BASE_URL}/items/${id}`);
-  const data = await response.json();
-  console.log('Элемент:', data);
-  return data;
-}
-
-// Использование:
-createItem().then(id => {
-  getAllItems();
-  getItemById(id);
-});
-```
-
-### Понимание HTTP методов
-
-- **GET** — получить данные (чтение)
-- **POST** — создать новые данные
-- **PUT** — обновить существующие данные
-- **DELETE** — удалить данные
-
-### Понимание кодов ответов
-
-- **200** — успешно
-- **201** — успешно создано
-- **404** — не найдено
-- **500** — ошибка сервера
-
-### Полезные советы
-
-1. **Всегда начинайте с Swagger UI** (`/docs`) — это самый простой способ понять API
-2. **Используйте Postman или Insomnia** — специальные программы для тестирования API
-3. **Проверяйте формат данных** — API ожидает JSON формат
-4. **Обрабатывайте ошибки** — всегда проверяйте код ответа перед использованием данных
-
-### Что дальше?
-
-После того как вы освоите базовые операции:
-- Изучите документацию FastAPI: https://fastapi.tiangolo.com/
-- Добавьте базу данных для хранения данных
-- Добавьте аутентификацию и авторизацию
-- Создайте свой собственный API с нужными вам endpoints
-
-Удачи в изучении API! 🚀
+MIT
